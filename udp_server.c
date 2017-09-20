@@ -13,7 +13,7 @@
 #include <memory.h>
 #include <string.h>
 
-#define MAXBUFSIZE 100
+#define MAXBUFSIZE 1000000
 
 int main (int argc, char * argv[] )
 {
@@ -21,7 +21,7 @@ int main (int argc, char * argv[] )
 	struct sockaddr_in sin, clientServer;     //"Internet socket address structure"
 	unsigned int clientServerSize;            //length of the sockaddr_in structure
 	int sentBytes, recvBytes;              //number of bytes we send and receive in the message
-	char buffer[MAXBUFSIZE];               //a buffer to store received message
+	char recvBuffer[MAXBUFSIZE];               //a buffer to store received message
 	
 	if (argc != 2)
 	{
@@ -54,20 +54,19 @@ int main (int argc, char * argv[] )
 	clientServerSize = sizeof(clientServer);
 
 	while (1) {
-		bzero(buffer,sizeof(buffer));
-		recvBytes = recvfrom(udpSocket, buffer, MAXBUFSIZE, 0, (struct sockaddr *)&clientServer, &clientServerSize);
-		
-		if (recvBytes < 0){
+		bzero(recvBuffer,sizeof(recvBuffer));
+		recvBytes = recvfrom(udpSocket, recvBuffer, MAXBUFSIZE, 0, (struct sockaddr *)&clientServer, &clientServerSize);
+		if (recvBytes < 0)
 			printf("Error in receiving the message.\n");
-		}
 
-		printf("The client says %s\n", buffer);
+		printf("The client says %s\n", recvBuffer);
 
-		char msg[] = "hello";
+		char msg[] = "received";
 		sentBytes = sendto(udpSocket, msg, strlen(msg), 0, (struct sockaddr *)&clientServer, clientServerSize);
 		if (sentBytes < 0){
 			printf("Error sending message.\n");
 		}
+		bzero(recvBuffer,sizeof(recvBuffer));
 	}
 	printf("Closing the socket!\n");
 	close(udpSocket);
