@@ -13,20 +13,21 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAXBUFSIZE 100
+#define MAXBUFSIZE 1024
 
+//This function gives size of the file
 long getFileSize(FILE *fp){
 	fseek(fp, 0, SEEK_END);
     long fileSize = ftell(fp);
 	return fileSize;
 }
 
-// This functions returns packets with fixed size
+//This function returns packets with fixed size
 long getPacketCount(size_t fileSize, long packetSize){
 	return(fileSize/packetSize);
 }
 
-// This functions returns packets with fixed size
+//This function returns remaining number of bytes
 long getRemainingBytes(size_t fileSize, long packetSize){
 	return(fileSize%packetSize);
 }
@@ -41,10 +42,11 @@ int main (int argc, char * argv[])
 	struct sockaddr_in remoteServer;              //"Internet socket address structure"
 	int remoteServerSize;
 	int choice;
-	char *filename = malloc(50);
+	char filename[100];
 	FILE *fp;
-	uint32_t fSize;
-	long fileSize, packetSize = 1024, packetCount, remainingBytes;
+	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeSent = 0, fileSizeReceived = 0;
+	char command[100];
+	uint32_t ack = 1;
 
 	if (argc < 3)
 	{
@@ -64,83 +66,136 @@ int main (int argc, char * argv[])
 	{
 		printf("unable to create socket");
 	}
+	
+	remoteServerSize = sizeof(remoteServer);
 
 	//-----------------------------------------------------------------------------------------------------------------
 	//sendto() sends immediately. It will report an error if the message fails to leave the computer. However, with UDP, there is no error if the message is lost in the network once it leaves the computer.
-	while(choice != 5){
+	while(strcmp(command, "exit\n") != 0){
 		printf("\nMENU\n");
-		printf("Enter 1 to GET the file\nEnter 2 to PUT the file\nEnter 3 to DELETE the file\nEnter 4 to LIST the file\nEnter 5 to EXIT from here\nEnter your choice: \n");
-		scanf("%d", &choice);
+		printf("Type get to get the file\nType put to send the file\nType delete to delete the file\nType ls to list the files in directory\nType exit to exit from here\nEnter here: \n");
+		fgets(command, 200, stdin);
 		
-		//Client exits
-		if(choice == 5){
-			printf("Goodbye!\n");
-			close(udpSocket);
-			exit(0);
-		}
+		//send the command to the server
+		if((sendto(udpSocket, command, sizeof(command), 0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0){
+			printf("\nError in sending command to the server!\n");
+			bzero(command,sizeof(command));
+        }
 		
-		//PUT command
-		else if(choice == 2){
-			printf("\nPUT\n");
-			printf("Please enter the filename to send to server: ");
-			scanf("%s", filename);
-			printf("Filename: %s", filename);
-			
-			if(fp = fopen(filename, "rb")){
-				printf("\nFile exists!\n");
-				fileSize = getFileSize(fp);
-				printf("File Size: %ld KB\n", fileSize);
-				fSize = htonl(fileSize);
-				packetCount = getPacketCount(fileSize,packetSize);
-				remainingBytes = getRemainingBytes(fileSize,packetSize);
-				printf("Number of packets: %ld \n", packetCount);
-				printf("Number of packets: %ld \n", remainingBytes);
-				fseek(fp, 0, SEEK_SET);
-				if (fread(buffer, sizeof(char), packetSize, fp) <= 0) {
-					printf("\nCopy Error!\n");
-                    bzero(buffer,sizeof(buffer));
-				}
-        		else{
-					printf("\nCopy to buffer Successful!\n");
-					sentBytes = sendto(udpSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&remoteServer, sizeof(remoteServer));
-					if (sentBytes < 0){
-						printf("\nError sending file to server!\n");
-						bzero(buffer,sizeof(buffer));
-                    }
-					else{
-						recvBytes = recvfrom(udpSocket, recvBuffer, MAXBUFSIZE, 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
-						if(recvBytes < 0)
-							printf("Error in recvfrom\n");
-						else
-							printf("Server says %s\n", recvBuffer);
-					}
-				}
+		else{		
+			//Client exits
+			if(strcmp(command, "exit\n") == 0){
+				printf("Goodbye!\n");
+				close(udpSocket);
+				exit(0);
 			}
-			else{
-				printf("\nFile does not exist! Please try again...\n");
-			}
-		}
-		
-		//LS command
-		else if(choice == 4){
-			printf("\nLS\n");
 			
-			char command[] = "hello";
-			remoteServerSize = sizeof(remoteServer);
-			sentBytes = sendto(udpSocket, command, strlen(command), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
+			//PUT command
+			else if(strcmp(command, "put\n") == 0){
+				printf("\nPUT\n");
+				printf("Please enter the filename to send to server: ");
+				scanf("%s", filename);
+				printf("Filename: %s", filename);
+				
+				//send the filename to server
+				if((sendto(udpSocket, filename, sizeof(filename),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0)
+					printf("\nError sending file name to server!\n");
+				
+				
+				if(fp = fopen(filename, "rb")){
+					printf("\nFile exists!\n");
+					fileSize = getFileSize(fp);
+					printf("File Size: %ld KB\n", fileSize);
+					packetCount = getPacketCount(fileSize,packetSize);
+					remainingBytes = getRemainingBytes(fileSize,packetSize);
+					printf("Number of packets: %ld \n", packetCount);
+					printf("Number of remaining bytes: %ld \n", remainingBytes);
+					fseek(fp, 0, SEEK_SET);
+					
+					//send the filesize to server
+					if((sendto(udpSocket, &fileSize, sizeof(fileSize),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0)
+						printf("\nError sending file size to server!\n");
+					
+					bzero(buffer,sizeof(buffer));
+					
+					//re-initialize fileSizeSent
+					fileSizeSent = 0;
+					
+					while(fileSizeSent < fileSize){
+						if(packetCount > 0){
+							if (fread(buffer, sizeof(char), packetSize, fp) <= 0) {
+								printf("\nCopy Error!\n");
+								bzero(buffer,sizeof(buffer));
+							}
+							else{				
+								//send the packets to server
+								if((sendto(udpSocket, buffer, sizeof(buffer),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0){
+									printf("\nError sending packets!\n");
+									bzero(buffer,sizeof(buffer));
+								}
+								else{
+									usleep(100);
+									recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
+									printf("ack received: %d\n",ack);
+									if(ack == 0)
+										sendto(udpSocket, buffer, sizeof(buffer),0, (struct sockaddr *)&remoteServer, remoteServerSize);
+								}
+							}//end of else copy to buffer
+						}//end of if(packetCount > 0)
+						
+					
+						//handle the remainingBytes if packetCount == 0
+						else if(!packetCount && remainingBytes){
+							//read remainingBytes into buffer
+							if (fread(buffer, sizeof(char), remainingBytes, fp) <= 0) {
+                        	  	printf("\nCopy Error!\n");
+								bzero(buffer,sizeof(buffer));
+							}
+							//send last bytes to server
+							if (sendto(udpSocket,buffer, remainingBytes, 0, (struct sockaddr *)&remoteServer, remoteServerSize) < 0){
+        	                    printf("\nError in sending the last bytes");
+                	            bzero(buffer,sizeof(buffer));
+                        	}
+							else{
+								usleep(100);
+								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
+								printf("ack received: %d\n",ack);
+								if(ack == 0)
+									sendto(udpSocket, buffer, remainingBytes,0, (struct sockaddr *)&remoteServer, remoteServerSize);
+								fileSizeSent = fileSizeSent + remainingBytes;
+								fclose(fp);
+							}
+						}
+						fileSizeSent = fileSizeSent + packetSize;
+						--packetCount;
+					}//end of while fileSizeSent < fileSize
+				}//end of if fileopen()
+				else
+					printf("\nFile does not exist! Please try again...\n");
+			}//end of PUT
+			
+			
+			//LS command
+			else if(strcmp(command, "ls\n") == 0){
+				printf("\nLS\n");
+				
+				char command2[] = "hello";
+				remoteServerSize = sizeof(remoteServer);
+				sentBytes = sendto(udpSocket, command2, strlen(command2), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
 
-			if (sentBytes < 0){
-				printf("Error in sendto\n");
-			}
-		
-			bzero(buffer,sizeof(buffer));
-			recvBytes = recvfrom(udpSocket, recvBuffer, MAXBUFSIZE, 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
-			if(recvBytes < 0)
-				printf("Error in recvfrom\n");
-			else
-				printf("Server says %s\n", recvBuffer);
-		}
-	}
+				if (sentBytes < 0){
+					printf("Error in sendto\n");
+				}
+			
+				bzero(buffer,sizeof(buffer));
+				recvBytes = recvfrom(udpSocket, recvBuffer, MAXBUFSIZE, 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
+				if(recvBytes < 0)
+					printf("Error in recvfrom\n");
+				else
+					printf("Server says %s\n", recvBuffer);
+			}//end of LS
+		}//end of else of sendto of command
+	}//end of while
 
 	printf("Closing socket!\n");
 	close(udpSocket);
