@@ -39,6 +39,7 @@ int main (int argc, char * argv[])
 	int udpSocket;                               //this will be our socket
 	char buffer[MAXBUFSIZE];
 	char recvBuffer[MAXBUFSIZE];
+	char packetBuffer[MAXBUFSIZE];
 	struct sockaddr_in remoteServer;              //"Internet socket address structure"
 	int remoteServerSize;
 	int choice;
@@ -89,6 +90,88 @@ int main (int argc, char * argv[])
 				close(udpSocket);
 				exit(0);
 			}
+			
+			//GET command
+			else if(strcmp(command, "get\n") == 0){
+				printf("\nPUT\n");
+				printf("Please enter the filename to fetch from the server: ");
+				scanf("%s", filename);
+				printf("Filename: %s", filename);
+				
+				//send the filename to server
+				if((sendto(udpSocket, filename, sizeof(filename),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0)
+					printf("\nError sending file name to server!\n");
+				
+				//receive filesize from client
+				if((recvfrom(udpSocket, &fileSize, sizeof(fileSize), 0, (struct sockaddr *)&remoteServer, &remoteServerSize)) < 0)
+					printf("\nError in receiving file size!\n");
+				else{
+					printf("File Size: %ld KB\n", fileSize);
+					packetCount = getPacketCount(fileSize,packetSize);
+					remainingBytes = getRemainingBytes(fileSize,packetSize);
+					printf("Number of packets: %ld \n", packetCount);
+					printf("Number of remaining bytes: %ld \n", remainingBytes);
+					fp = fopen(filename,"wb");
+					
+					bzero(recvBuffer,sizeof(recvBuffer));
+					
+					while(fileSizeReceived < fileSize){
+						if(packetCount > 0){
+							//Now receive the contents of the packet from server
+							if(recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize) < packetSize){
+								printf("\nError in receiving packet content into the buffer!\n");
+								//Copy contents of recvBuffer
+								strcpy(packetBuffer,recvBuffer);
+								//send acknowledgement = 0 if packet transfer error
+								ack = 0;
+								sendto(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+							
+							else{
+								ack = 1;
+								sendto(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
+								if(strcmp(packetBuffer,recvBuffer) == 0)
+									strcpy(recvBuffer,packetBuffer);
+							}
+							
+							//write contents of buffer to file put_result
+							//printf("%s",recvBuffer);
+							if (fwrite(recvBuffer, 1, packetSize, fp) < 0) {
+								printf("\nError writing file\n");
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+						}//end of if(packetCount > 0)
+						
+						//handle the remainingBytes if packetCount == 0
+						else if(!packetCount && remainingBytes){
+							if (recvfrom(udpSocket, recvBuffer, remainingBytes, 0, (struct sockaddr *)&remoteServer, &remoteServerSize) < remainingBytes) {
+								printf("\nError in receiving last bytes\n");
+								ack = 0;
+								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&remoteServer, remoteServerSize);
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+							else {
+								ack = 1;
+								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&remoteServer, remoteServerSize);
+							}
+                            
+							//write contents of buffer to file put_result
+							if (fwrite(recvBuffer, 1, remainingBytes, fp) < 0) {
+								printf("\nError writing file\n");
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+							fileSizeReceived = fileSizeReceived + remainingBytes;
+							printf("\nFile transfer complete.\n");
+							fclose(fp);
+						}
+						fileSizeReceived = fileSizeReceived + packetSize;
+						packetCount--;
+                        bzero(recvBuffer,sizeof(recvBuffer));
+					}//end of inner while
+				}
+				
+			}//end of GET
 			
 			//PUT command
 			else if(strcmp(command, "put\n") == 0){

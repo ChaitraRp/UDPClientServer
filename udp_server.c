@@ -15,6 +15,13 @@
 
 #define MAXBUFSIZE 1024
 
+//This function gives size of the file
+long getFileSize(FILE *fp){
+	fseek(fp, 0, SEEK_END);
+    long fileSize = ftell(fp);
+	return fileSize;
+}
+
 //This function returns packets with fixed size
 long getPacketCount(size_t fileSize, long packetSize){
 	return(fileSize/packetSize);
@@ -45,7 +52,7 @@ int main (int argc, char * argv[] )
 		exit(1);
 	}
 
-	//------------------------------------------------------------------------------------------------------------
+	//******************************************************************************************************************************
 	//This code populates the sockaddr_in struct with the information about our socket
 	bzero(&sin,sizeof(sin));                  //zero the struct
 	sin.sin_family = AF_INET;                   //get server machine ip
@@ -60,7 +67,7 @@ int main (int argc, char * argv[] )
 	}
 
 
-	//-------------------------------------------------------------------------------------------------------------
+	//******************************************************************************************************************************
 	//Once we've created a socket, we must bind that socket to the local address and port we've supplied in the sockaddr_in struct
 	if (bind(udpSocket, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 	{
@@ -81,7 +88,7 @@ int main (int argc, char * argv[] )
 			bzero(recvBuffer,sizeof(recvBuffer));	
 			
 			
-			//if client says EXIT
+			//if client types EXIT
 			if(strcmp(command, "exit\n") == 0){
 				bzero(command,sizeof(command));
 				printf("Goodbye!\n");
@@ -89,7 +96,90 @@ int main (int argc, char * argv[] )
 				exit(0);
 			}
 			
-			//if client says PUT
+			
+			//************************************************************************************************************************
+			//if client types GET
+			else if(strcmp(command, "get\n") == 0){
+				//receive file name from client
+				if((recvfrom(udpSocket, filename, sizeof(filename), 0, (struct sockaddr *)&clientServer, &clientServerSize)) < 0)
+					printf("\nError in receiving file name!\n");
+				printf("Filename: %s\n",filename);
+				
+				if(fp = fopen(filename, "rb")){
+					printf("\nFile exists!\n");
+					fileSize = getFileSize(fp);
+					printf("File Size: %ld KB\n", fileSize);
+					packetCount = getPacketCount(fileSize,packetSize);
+					remainingBytes = getRemainingBytes(fileSize,packetSize);
+					printf("Number of packets: %ld \n", packetCount);
+					printf("Number of remaining bytes: %ld \n", remainingBytes);
+					fseek(fp, 0, SEEK_SET);
+					
+					//send the filesize to client
+					if((sendto(udpSocket, &fileSize, sizeof(fileSize),0, (struct sockaddr *)&clientServer, clientServerSize)) < 0)
+						printf("\nError sending file size to client!\n");
+					
+					bzero(recvBuffer,sizeof(recvBuffer));
+					
+					//re-initialize fileSizeSent
+					fileSizeSent = 0;
+					
+					while(fileSizeSent < fileSize){
+						if(packetCount > 0){
+							if (fread(recvBuffer, sizeof(char), packetSize, fp) <= 0) {
+								printf("\nCopy Error!\n");
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+							else{				
+								//send the packets to client
+								if((sendto(udpSocket, recvBuffer, sizeof(recvBuffer),0, (struct sockaddr *)&clientServer, clientServerSize)) < 0){
+									printf("\nError sending packets!\n");
+									bzero(recvBuffer,sizeof(recvBuffer));
+								}
+								else{
+									usleep(100);
+									recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, &clientServerSize);
+									printf("ack received: %d\n",ack);
+									if(ack == 0)
+										sendto(udpSocket, recvBuffer, sizeof(recvBuffer),0, (struct sockaddr *)&clientServer, clientServerSize);
+								}
+							}//end of else copy to buffer
+						}//end of if(packetCount > 0)
+						
+					
+						//handle the remainingBytes if packetCount == 0
+						else if(!packetCount && remainingBytes){
+							//read remainingBytes into buffer
+							if (fread(recvBuffer, sizeof(char), remainingBytes, fp) <= 0) {
+                        	  	printf("\nCopy Error!\n");
+								bzero(recvBuffer,sizeof(recvBuffer));
+							}
+							//send last bytes to client
+							if (sendto(udpSocket,recvBuffer, remainingBytes, 0, (struct sockaddr *)&clientServer, clientServerSize) < 0){
+        	                    printf("\nError in sending the last bytes");
+                	            bzero(recvBuffer,sizeof(recvBuffer));
+                        	}
+							else{
+								usleep(100);
+								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, &clientServerSize);
+								printf("ack received: %d\n",ack);
+								if(ack == 0)
+									sendto(udpSocket, recvBuffer, remainingBytes,0, (struct sockaddr *)&clientServer, clientServerSize);
+								fileSizeSent = fileSizeSent + remainingBytes;
+								fclose(fp);
+							}
+						}
+						fileSizeSent = fileSizeSent + packetSize;
+						--packetCount;
+					}//end of while fileSizeSent < fileSize
+				}//end of if fileopen()
+				else
+					printf("\nFile does not exist! Please try again...\n");
+			}//end of GET
+			
+			
+			//************************************************************************************************************************
+			//if client types PUT
 			else if(strcmp(command, "put\n") == 0){
 				bzero(command,sizeof(command));
 				
