@@ -257,6 +257,36 @@ int main (int argc, char * argv[] )
 					}//end of inner while
 				}
 			}//end of PUT
+			
+			//***********************************************************************************************************************
+			//if client types ls
+			else if(strcmp(command, "ls\n") == 0){
+				bzero(recvBuffer,sizeof(recvBuffer));
+				system("ls > ls_output.txt");
+				printf("\nls command executed and output stored in ls_output.txt\n");
+				
+				//read the file ls_output.txt and store it into buffer
+				fp = fopen("ls_output.txt", "rb");
+                fileSize = getFileSize(fp);
+				printf("Filesize: %ld KB", fileSize);
+                fseek(fp, 0, SEEK_SET);
+				
+				if (fread(recvBuffer, sizeof(char), fileSize, fp) <= 0){
+					printf("\nCopy error!\n");
+					bzero(recvBuffer,sizeof(recvBuffer));
+				}
+				else{
+					if (sendto(udpSocket,recvBuffer,strlen(recvBuffer), 0, (struct sockaddr *)&clientServer, clientServerSize) < 0){
+						printf("\nError in send to\n");
+						bzero(recvBuffer,sizeof(recvBuffer));
+					}
+					else{
+						printf("\nls output sent successfully\n");
+						fclose(fp);
+						bzero(recvBuffer,sizeof(recvBuffer));
+					}
+				}
+			}//end of LS
 		}//end of receive command check else
 	}//end of while
 	printf("Closing the socket!\n");

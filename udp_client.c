@@ -55,7 +55,7 @@ int main (int argc, char * argv[])
 		exit(1);
 	}
 
-	//----------------------------------------------------------------------------------------------------------------
+	//*****************************************************************************************************************************
 	//Here we populate a sockaddr_in struct with information regarding where we'd like to send our packet
 	bzero(&remoteServer,sizeof(remoteServer));               //zero the struct
 	remoteServer.sin_family = AF_INET;                 //address family
@@ -70,7 +70,7 @@ int main (int argc, char * argv[])
 	
 	remoteServerSize = sizeof(remoteServer);
 
-	//-----------------------------------------------------------------------------------------------------------------
+	//*****************************************************************************************************************************
 	//sendto() sends immediately. It will report an error if the message fails to leave the computer. However, with UDP, there is no error if the message is lost in the network once it leaves the computer.
 	while(strcmp(command, "exit\n") != 0){
 		printf("\nMENU\n");
@@ -91,6 +91,8 @@ int main (int argc, char * argv[])
 				exit(0);
 			}
 			
+			
+			//*****************************************************************************************************************************
 			//GET command
 			else if(strcmp(command, "get\n") == 0){
 				printf("\nPUT\n");
@@ -173,6 +175,8 @@ int main (int argc, char * argv[])
 				
 			}//end of GET
 			
+			
+			//*************************************************************************************************************************
 			//PUT command
 			else if(strcmp(command, "put\n") == 0){
 				printf("\nPUT\n");
@@ -241,6 +245,7 @@ int main (int argc, char * argv[])
                         	}
 							else{
 								usleep(100);
+								
 								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
 								printf("ack received: %d\n",ack);
 								if(ack == 0)
@@ -258,24 +263,19 @@ int main (int argc, char * argv[])
 			}//end of PUT
 			
 			
+			//*************************************************************************************************************************
 			//LS command
 			else if(strcmp(command, "ls\n") == 0){
-				printf("\nLS\n");
-				
-				char command2[] = "hello";
-				remoteServerSize = sizeof(remoteServer);
-				sentBytes = sendto(udpSocket, command2, strlen(command2), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
-
-				if (sentBytes < 0){
-					printf("Error in sendto\n");
+				bzero(recvBuffer,sizeof(recvBuffer));
+				bzero(command,sizeof(command));
+				if(recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize) < 0){
+					printf("\nError receiving the output of ls\n");
+					bzero(recvBuffer,sizeof(recvBuffer));
 				}
-			
-				bzero(buffer,sizeof(buffer));
-				recvBytes = recvfrom(udpSocket, recvBuffer, MAXBUFSIZE, 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
-				if(recvBytes < 0)
-					printf("Error in recvfrom\n");
-				else
-					printf("Server says %s\n", recvBuffer);
+				else{
+					printf("\nls output:\n%s\n", recvBuffer);
+					bzero(recvBuffer,sizeof(recvBuffer));
+				}
 			}//end of LS
 		}//end of else of sendto of command
 	}//end of while
