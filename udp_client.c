@@ -277,6 +277,25 @@ int main (int argc, char * argv[])
 					bzero(recvBuffer,sizeof(recvBuffer));
 				}
 			}//end of LS
+			
+			
+			//*************************************************************************************************************************
+			//DELETE command
+			else if(strcmp(command, "delete\n") == 0){
+				bzero(recvBuffer,sizeof(recvBuffer));
+				bzero(command,sizeof(command));
+				printf("Please enter the filename to fetch from the server: ");
+				scanf("%s", filename);
+				
+				//send the filename to server
+				if((sendto(udpSocket, filename, sizeof(filename),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0)
+					printf("\nError sending file name to server!\n");
+				
+				else{
+					recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize)
+					printf("Server says: %s", recvBuffer);
+				}
+			}
 		}//end of else of sendto of command
 	}//end of while
 

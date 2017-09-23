@@ -44,6 +44,7 @@ int main (int argc, char * argv[] )
 	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeReceived = 0, fileSizeSent = 0;
 	FILE *fp;
 	char filename[100];
+	char deleteCommand[50];
 	uint32_t ack;
 	
 	if (argc != 2)
@@ -287,6 +288,35 @@ int main (int argc, char * argv[] )
 					}
 				}
 			}//end of LS
+			
+			
+			//***********************************************************************************************************************
+			//if client types ls
+			else if(strcmp(command, "delete\n") == 0){
+				//receive file name from client
+				if((recvfrom(udpSocket, filename, sizeof(filename), 0, (struct sockaddr *)&clientServer, &clientServerSize)) < 0)
+					printf("\nError in receiving file name!\n");
+				printf("Filename: %s\n",filename);
+				
+				 if(!access(filename, F_OK )){
+					printf("\nFile exists!\n");
+					if(!remove(filename)){
+						char msg[] = "File successfully removed.";
+						printf("\n%s\n", msg);
+						sendto(udpSocket, msg, sizeof(msg),0, (struct sockaddr *)&clientServer, clientServerSize);
+					}
+					else{
+						char msg[] = "Not able to delete the file!";
+						printf("\n%s\n", msg);
+						sendto(udpSocket, msg, sizeof(msg),0, (struct sockaddr *)&clientServer, clientServerSize);
+					}
+				}
+				else{
+					char msg[] = "File does not exist! Please try again...";
+					printf("\n%s\n", msg);
+					sendto(udpSocket, msg, sizeof(msg),0, (struct sockaddr *)&clientServer, clientServerSize);
+				}
+			}
 		}//end of receive command check else
 	}//end of while
 	printf("Closing the socket!\n");
