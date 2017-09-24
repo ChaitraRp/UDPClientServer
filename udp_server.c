@@ -13,7 +13,7 @@
 #include <memory.h>
 #include <string.h>
 
-#define MAXBUFSIZE 1024
+#define MAXBUFSIZE 10000
 
 //This function gives size of the file
 long getFileSize(FILE *fp){
@@ -36,12 +36,12 @@ int main (int argc, char * argv[] )
 {
 	int udpSocket;
 	struct sockaddr_in sin, clientServer;
-	unsigned int clientServerSize;
+	int clientServerSize;
 	int sentBytes, recvBytes;
 	char recvBuffer[MAXBUFSIZE];
 	char packetBuffer[MAXBUFSIZE];
 	char command[100];
-	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeReceived = 0, fileSizeSent = 0;
+	long fileSize = 0, packetSize = 10000, packetCount = 0, remainingBytes = 0, fileSizeReceived = 0, fileSizeSent = 0;
 	FILE *fp;
 	char filename[100];
 	char deleteCommand[50];
@@ -222,7 +222,7 @@ int main (int argc, char * argv[] )
 									strcpy(recvBuffer,packetBuffer);
 							}
 							
-							//write contents of buffer to file put_result
+							//write contents of buffer to file
 							//printf("%s",recvBuffer);
 							if (fwrite(recvBuffer, 1, packetSize, fp) < 0) {
 								printf("\nError writing file\n");

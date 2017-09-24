@@ -13,7 +13,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAXBUFSIZE 1024
+#define MAXBUFSIZE 10000
 
 //This function gives size of the file
 long getFileSize(FILE *fp){
@@ -32,6 +32,21 @@ long getRemainingBytes(size_t fileSize, long packetSize){
 	return(fileSize%packetSize);
 }
 
+/*
+void storeMD5(char[] filename2){
+	char md5Command[] = "md5sum ";
+	strcat(md5Command,filename2);
+	strcat(md5Command," > md5.txt");
+	system(md5Command);
+	
+	if(fp = fopen("md5.txt", "r")){
+	bzero(buffer,sizeof(buffer));
+	fgets(buffer, 300, fp);
+	printf("MD5: %s", buffer);
+	bzero(buffer,sizeof(buffer));
+	}
+}*/
+
 int main (int argc, char * argv[])
 {
 
@@ -45,7 +60,7 @@ int main (int argc, char * argv[])
 	int choice;
 	char filename[100];
 	FILE *fp;
-	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeSent = 0, fileSizeReceived = 0;
+	long fileSize = 0, packetSize = 10000, packetCount = 0, remainingBytes = 0, fileSizeSent = 0, fileSizeReceived = 0;
 	char command[100];
 	int ack = 1;
 
@@ -95,7 +110,7 @@ int main (int argc, char * argv[])
 			//*****************************************************************************************************************************
 			//GET command
 			else if(strcmp(command, "get\n") == 0){
-				printf("\nPUT\n");
+				printf("\nGET\n");
 				printf("Please enter the filename to fetch from the server: ");
 				scanf("%s", filename);
 				printf("Filename: %s", filename);
@@ -179,6 +194,7 @@ int main (int argc, char * argv[])
 			//*************************************************************************************************************************
 			//PUT command
 			else if(strcmp(command, "put\n") == 0){
+				int count = 0;
 				printf("\nPUT\n");
 				printf("Please enter the filename to send to server: ");
 				scanf("%s", filename);
@@ -223,7 +239,9 @@ int main (int argc, char * argv[])
 								else{
 									usleep(100);
 									recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
-									printf("ack received: %d\n",ack);
+									//printf("ack received: %d\n",ack);
+									printf("%d\n", count);
+									count++;
 									if(ack == 0)
 										sendto(udpSocket, buffer, sizeof(buffer),0, (struct sockaddr *)&remoteServer, remoteServerSize);
 								}
@@ -247,19 +265,23 @@ int main (int argc, char * argv[])
 								usleep(100);
 								
 								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
-								printf("ack received: %d\n",ack);
+								printf("%d\n", count);
+									count++;
 								if(ack == 0)
 									sendto(udpSocket, buffer, remainingBytes,0, (struct sockaddr *)&remoteServer, remoteServerSize);
 								fileSizeSent = fileSizeSent + remainingBytes;
 								fclose(fp);
+								bzero(buffer,sizeof(buffer));
 							}
 						}
 						fileSizeSent = fileSizeSent + packetSize;
 						--packetCount;
 					}//end of while fileSizeSent < fileSize
 				}//end of if fileopen()
-				else
+				else{
 					printf("\nFile does not exist! Please try again...\n");
+					bzero(buffer,sizeof(buffer));
+				}
 			}//end of PUT
 			
 			
