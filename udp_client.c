@@ -35,19 +35,19 @@ long getRemainingBytes(size_t fileSize, long packetSize){
 int main (int argc, char * argv[])
 {
 
-	int sentBytes, recvBytes;                             // number of bytes sent by sendto()
-	int udpSocket;                               //this will be our socket
+	int sentBytes, recvBytes;
+	int udpSocket;
 	char buffer[MAXBUFSIZE];
 	char recvBuffer[MAXBUFSIZE];
 	char packetBuffer[MAXBUFSIZE];
-	struct sockaddr_in remoteServer;              //"Internet socket address structure"
+	struct sockaddr_in remoteServer;
 	int remoteServerSize;
 	int choice;
 	char filename[100];
 	FILE *fp;
 	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeSent = 0, fileSizeReceived = 0;
 	char command[100];
-	uint32_t ack = 1;
+	int ack = 1;
 
 	if (argc < 3)
 	{
@@ -284,7 +284,7 @@ int main (int argc, char * argv[])
 			else if(strcmp(command, "delete\n") == 0){
 				bzero(recvBuffer,sizeof(recvBuffer));
 				bzero(command,sizeof(command));
-				printf("Please enter the filename to fetch from the server: ");
+				printf("Please enter the filename to delete: ");
 				scanf("%s", filename);
 				
 				//send the filename to server
@@ -292,7 +292,7 @@ int main (int argc, char * argv[])
 					printf("\nError sending file name to server!\n");
 				
 				else{
-					recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize)
+					recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize);
 					printf("Server says: %s", recvBuffer);
 				}
 			}

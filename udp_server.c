@@ -34,18 +34,18 @@ long getRemainingBytes(size_t fileSize, long packetSize){
 
 int main (int argc, char * argv[] )
 {
-	int udpSocket;                         //This will be our socket
-	struct sockaddr_in sin, clientServer;     //"Internet socket address structure"
-	unsigned int clientServerSize;            //length of the sockaddr_in structure
-	int sentBytes, recvBytes;              //number of bytes we send and receive in the message
-	char recvBuffer[MAXBUFSIZE];               //a buffer to store received message
+	int udpSocket;
+	struct sockaddr_in sin, clientServer;
+	unsigned int clientServerSize;
+	int sentBytes, recvBytes;
+	char recvBuffer[MAXBUFSIZE];
 	char packetBuffer[MAXBUFSIZE];
 	char command[100];
 	long fileSize, packetSize = 1024, packetCount, remainingBytes, fileSizeReceived = 0, fileSizeSent = 0;
 	FILE *fp;
 	char filename[100];
 	char deleteCommand[50];
-	uint32_t ack;
+	int ack;
 	
 	if (argc != 2)
 	{
