@@ -124,6 +124,7 @@ int main (int argc, char * argv[])
 					printf("\nError in receiving file size!\n");
 				else{
 					printf("File Size: %ld KB\n", fileSize);
+					//calculate the number of packets
 					packetCount = getPacketCount(fileSize,packetSize);
 					remainingBytes = getRemainingBytes(fileSize,packetSize);
 					printf("Number of packets: %ld \n", packetCount);
@@ -132,7 +133,8 @@ int main (int argc, char * argv[])
 					
 					bzero(recvBuffer,sizeof(recvBuffer));
 					
-					while(fileSizeReceived < fileSize){
+					//create a loop to receive the file packet by packet until the fileSizeReceived == fileSize
+					while(afileSizeReceived < fileSize){
 						if(packetCount > 0){
 							//Now receive the contents of the packet from server
 							if(recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize) < packetSize){
@@ -146,6 +148,7 @@ int main (int argc, char * argv[])
 							}
 							
 							else{
+								//send positive acknowledgement if transfer is successful
 								ack = 1;
 								sendto(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, remoteServerSize);
 								if(strcmp(packetBuffer,recvBuffer) == 0)
@@ -162,13 +165,16 @@ int main (int argc, char * argv[])
 						
 						//handle the remainingBytes if packetCount == 0
 						else if(!packetCount && remainingBytes){
+							//receive the remainingBytes
 							if (recvfrom(udpSocket, recvBuffer, remainingBytes, 0, (struct sockaddr *)&remoteServer, &remoteServerSize) < remainingBytes) {
 								printf("\nError in receiving last bytes\n");
+								//if error in receiving last bytes send negative acknowledgement
 								ack = 0;
 								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&remoteServer, remoteServerSize);
 								bzero(recvBuffer,sizeof(recvBuffer));
 							}
 							else {
+								//if no error in receiving last bytes send positive acknowledgement
 								ack = 1;
 								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&remoteServer, remoteServerSize);
 							}
@@ -178,10 +184,14 @@ int main (int argc, char * argv[])
 								printf("\nError writing file\n");
 								bzero(recvBuffer,sizeof(recvBuffer));
 							}
+							
+							//calculate the fileSizeReceived so far
 							fileSizeReceived = fileSizeReceived + remainingBytes;
 							printf("\nFile transfer complete.\n");
 							fclose(fp);
 						}
+						
+						//calculate the fileSizeReceived so far
 						fileSizeReceived = fileSizeReceived + packetSize;
 						packetCount--;
                         bzero(recvBuffer,sizeof(recvBuffer));
@@ -204,11 +214,12 @@ int main (int argc, char * argv[])
 				if((sendto(udpSocket, filename, sizeof(filename),0, (struct sockaddr *)&remoteServer, remoteServerSize)) < 0)
 					printf("\nError sending file name to server!\n");
 				
-				
+				//open the file
 				if(fp = fopen(filename, "rb")){
 					printf("\nFile exists!\n");
 					fileSize = getFileSize(fp);
 					printf("File Size: %ld KB\n", fileSize);
+					//calculate the number of packets
 					packetCount = getPacketCount(fileSize,packetSize);
 					remainingBytes = getRemainingBytes(fileSize,packetSize);
 					printf("Number of packets: %ld \n", packetCount);
@@ -224,6 +235,7 @@ int main (int argc, char * argv[])
 					//re-initialize fileSizeSent
 					fileSizeSent = 0;
 					
+					//create a loop to send the file packet by packet until the fileSizeSent == fileSize
 					while(fileSizeSent < fileSize){
 						if(packetCount > 0){
 							if (fread(buffer, sizeof(char), packetSize, fp) <= 0) {
@@ -238,10 +250,13 @@ int main (int argc, char * argv[])
 								}
 								else{
 									usleep(100);
+									//receive the ack from the sever
 									recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
 									//printf("ack received: %d\n",ack);
 									printf("%d\n", count);
 									count++;
+									
+									//if ack received is negative, then resend the last packet
 									if(ack == 0)
 										sendto(udpSocket, buffer, sizeof(buffer),0, (struct sockaddr *)&remoteServer, remoteServerSize);
 								}
@@ -263,17 +278,23 @@ int main (int argc, char * argv[])
                         	}
 							else{
 								usleep(100);
-								
+								//receive the acknowledgement number
 								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&remoteServer, &remoteServerSize);
 								printf("%d\n", count);
 									count++;
+									
+								//if acknowledgement is 0, resend the last set of bytes
 								if(ack == 0)
 									sendto(udpSocket, buffer, remainingBytes,0, (struct sockaddr *)&remoteServer, remoteServerSize);
+								
+								//calculate the fileSizeSent so far
 								fileSizeSent = fileSizeSent + remainingBytes;
 								fclose(fp);
 								bzero(buffer,sizeof(buffer));
 							}
 						}
+						
+						//calculate the fileSizeSent so far
 						fileSizeSent = fileSizeSent + packetSize;
 						--packetCount;
 					}//end of while fileSizeSent < fileSize

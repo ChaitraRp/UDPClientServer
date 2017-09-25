@@ -55,10 +55,10 @@ int main (int argc, char * argv[] )
 
 	//******************************************************************************************************************************
 	//This code populates the sockaddr_in struct with the information about our socket
-	bzero(&sin,sizeof(sin));                  //zero the struct
-	sin.sin_family = AF_INET;                   //get server machine ip
-	sin.sin_port = htons(atoi(argv[1]));        //htons() sets the port # to network byte order
-	sin.sin_addr.s_addr = INADDR_ANY;           //supplies the IP address of the local machine
+	bzero(&sin,sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(atoi(argv[1]));
+	sin.sin_addr.s_addr = INADDR_ANY;
 
 
 	//Causes the system to create a generic socket of type UDP (datagram)
@@ -85,6 +85,7 @@ int main (int argc, char * argv[] )
 			bzero(command,sizeof(command));
 		}
 		else{
+			//after receiving the command, zero the recvBuffer
 			printf("\nCommand received: %s\n", command);
 			bzero(recvBuffer,sizeof(recvBuffer));	
 			
@@ -108,8 +109,11 @@ int main (int argc, char * argv[] )
 				
 				if(fp = fopen(filename, "rb")){
 					printf("\nFile exists!\n");
+					//get the size of the file
 					fileSize = getFileSize(fp);
 					printf("File Size: %ld KB\n", fileSize);
+					
+					//calculate the packetCount and remainingBytes
 					packetCount = getPacketCount(fileSize,packetSize);
 					remainingBytes = getRemainingBytes(fileSize,packetSize);
 					printf("Number of packets: %ld \n", packetCount);
@@ -122,9 +126,10 @@ int main (int argc, char * argv[] )
 					
 					bzero(recvBuffer,sizeof(recvBuffer));
 					
-					//re-initialize fileSizeSent
+					//initialize fileSizeSent
 					fileSizeSent = 0;
 					
+					//create a loop to send the file packet by packet until the fileSizeSent == fileSize
 					while(fileSizeSent < fileSize){
 						if(packetCount > 0){
 							if (fread(recvBuffer, sizeof(char), packetSize, fp) <= 0) {
@@ -139,8 +144,10 @@ int main (int argc, char * argv[] )
 								}
 								else{
 									usleep(100);
+									//receive positive ack from the client
 									recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, &clientServerSize);
 									printf("ack received: %d\n",ack);
+									//if ack is negative, then resend the packet for which the ack was negative
 									if(ack == 0)
 										sendto(udpSocket, recvBuffer, sizeof(recvBuffer),0, (struct sockaddr *)&clientServer, clientServerSize);
 								}
@@ -162,14 +169,19 @@ int main (int argc, char * argv[] )
                         	}
 							else{
 								usleep(100);
+								//receive positive ack from the client
 								recvfrom(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, &clientServerSize);
 								printf("ack received: %d\n",ack);
+								//if ack is negative, then resend the packet for which the ack was negative
 								if(ack == 0)
 									sendto(udpSocket, recvBuffer, remainingBytes,0, (struct sockaddr *)&clientServer, clientServerSize);
+								
+								//calculate the fileSizeSent so far
 								fileSizeSent = fileSizeSent + remainingBytes;
 								fclose(fp);
 							}
 						}
+						//calculate the fileSizeSent so far
 						fileSizeSent = fileSizeSent + packetSize;
 						--packetCount;
 					}//end of while fileSizeSent < fileSize
@@ -194,6 +206,7 @@ int main (int argc, char * argv[] )
 					printf("\nError in receiving file size!\n");
 				else{
 					printf("File Size: %ld KB\n", fileSize);
+					//calculate the packetCount
 					packetCount = getPacketCount(fileSize,packetSize);
 					remainingBytes = getRemainingBytes(fileSize,packetSize);
 					printf("Number of packets: %ld \n", packetCount);
@@ -202,6 +215,7 @@ int main (int argc, char * argv[] )
 					
 					bzero(recvBuffer,sizeof(recvBuffer));
 					
+					//create a loop to receive the file packet by packet until the fileSizeReceived == fileSize
 					while(fileSizeReceived < fileSize){
 						if(packetCount > 0){
 							//Now receive the contents of the packet from client
@@ -209,13 +223,14 @@ int main (int argc, char * argv[] )
 								printf("\nError in receiving packet content into the buffer!\n");
 								//Copy contents of recvBuffer
 								strcpy(packetBuffer,recvBuffer);
-								//send acknowledgement = 0 if packet transfer error
+								//send acknowledgement = 0 (negative ack) if there is an error in transfer
 								ack = 0;
 								sendto(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, clientServerSize);
 								bzero(recvBuffer,sizeof(recvBuffer));
 							}
 							
 							else{
+								//send positive ack if packet is successfully received
 								ack = 1;
 								sendto(udpSocket, &ack, sizeof(ack), 0, (struct sockaddr *)&clientServer, clientServerSize);
 								if(strcmp(packetBuffer,recvBuffer) == 0)
@@ -232,13 +247,16 @@ int main (int argc, char * argv[] )
 						
 						//handle the remainingBytes if packetCount == 0
 						else if(!packetCount && remainingBytes){
+							//receive remainingBytes
 							if (recvfrom(udpSocket, recvBuffer, remainingBytes, 0, (struct sockaddr *)&clientServer, &clientServerSize) < remainingBytes) {
 								printf("\nError in receiving last bytes\n");
+								//if error in receiving send negative acknowledgement
 								ack = 0;
 								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&clientServer, clientServerSize);
 								bzero(recvBuffer,sizeof(recvBuffer));
 							}
 							else {
+								//if successfully then send  positive acknowledgement
 								ack = 1;
 								sendto(udpSocket, &ack, sizeof(ack), 0,  (struct sockaddr *)&clientServer, clientServerSize);
 							}
@@ -248,10 +266,13 @@ int main (int argc, char * argv[] )
 								printf("\nError writing file\n");
 								bzero(recvBuffer,sizeof(recvBuffer));
 							}
+							//calculate the fileSizeReceived so far
 							fileSizeReceived = fileSizeReceived + remainingBytes;
 							printf("\nFile transfer complete.\n");
 							fclose(fp);
 						}
+						
+						//calculate the fileSizeReceived so far
 						fileSizeReceived = fileSizeReceived + packetSize;
 						packetCount--;
                         bzero(recvBuffer,sizeof(recvBuffer));
@@ -299,8 +320,10 @@ int main (int argc, char * argv[] )
 					printf("\nError in receiving file name!\n");
 				printf("Filename: %s\n",filename);
 				
-				 if(!access(filename, F_OK )){
+				//check if file exists
+				if(!access(filename, F_OK )){
 					printf("\nFile exists!\n");
+					//command to delete the file
 					if(!remove(filename)){
 						char msg[] = "File successfully removed.";
 						printf("\n%s\n", msg);
