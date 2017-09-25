@@ -13,7 +13,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAXBUFSIZE 10000
+#define MAXBUFSIZE 1024
 
 //This function gives size of the file
 long getFileSize(FILE *fp){
@@ -60,7 +60,7 @@ int main (int argc, char * argv[])
 	int choice;
 	char filename[100];
 	FILE *fp;
-	long fileSize = 0, packetSize = 10000, packetCount = 0, remainingBytes = 0, fileSizeSent = 0, fileSizeReceived = 0;
+	long fileSize = 0, packetSize = 1024, packetCount = 0, remainingBytes = 0, fileSizeSent = 0, fileSizeReceived = 0;
 	char command[100];
 	int ack = 1;
 
@@ -316,6 +316,20 @@ int main (int argc, char * argv[])
 				else{
 					recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize);
 					printf("Server says: %s", recvBuffer);
+				}
+			}
+			
+			
+			//***********************************************************************************************************************
+			//if client types wrong command
+			else{
+				if(recvfrom(udpSocket, recvBuffer, sizeof(recvBuffer), 0,(struct sockaddr *)&remoteServer, &remoteServerSize)){
+					printf("Server says: %s", recvBuffer);
+					bzero(recvBuffer,sizeof(recvBuffer));
+				}
+				else{
+					printf("\nDid not receive a reply from the server.\n");
+					bzero(recvBuffer,sizeof(recvBuffer));
 				}
 			}
 		}//end of else of sendto of command

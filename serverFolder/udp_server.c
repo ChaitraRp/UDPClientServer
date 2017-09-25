@@ -13,7 +13,7 @@
 #include <memory.h>
 #include <string.h>
 
-#define MAXBUFSIZE 10000
+#define MAXBUFSIZE 1024
 
 //This function gives size of the file
 long getFileSize(FILE *fp){
@@ -41,7 +41,7 @@ int main (int argc, char * argv[] )
 	char recvBuffer[MAXBUFSIZE];
 	char packetBuffer[MAXBUFSIZE];
 	char command[100];
-	long fileSize = 0, packetSize = 10000, packetCount = 0, remainingBytes = 0, fileSizeReceived = 0, fileSizeSent = 0;
+	long fileSize = 0, packetSize = 1024, packetCount = 0, remainingBytes = 0, fileSizeReceived = 0, fileSizeSent = 0;
 	FILE *fp;
 	char filename[100];
 	char deleteCommand[50];
@@ -290,8 +290,9 @@ int main (int argc, char * argv[] )
 			}//end of LS
 			
 			
+			
 			//***********************************************************************************************************************
-			//if client types ls
+			//if client types delete
 			else if(strcmp(command, "delete\n") == 0){
 				//receive file name from client
 				if((recvfrom(udpSocket, filename, sizeof(filename), 0, (struct sockaddr *)&clientServer, &clientServerSize)) < 0)
@@ -315,6 +316,21 @@ int main (int argc, char * argv[] )
 					char msg[] = "File does not exist! Please try again...";
 					printf("\n%s\n", msg);
 					sendto(udpSocket, msg, sizeof(msg),0, (struct sockaddr *)&clientServer, clientServerSize);
+				}
+			}//end of delete
+			
+			
+			
+			//***********************************************************************************************************************
+			//if client types wrong command
+			else{
+				if (sendto(udpSocket,command,strlen(command), 0, (struct sockaddr *)&clientServer, clientServerSize) < 0){
+					printf("\nError in sendto. Did not understand the command\n");
+					bzero(command,sizeof(command));
+				}
+				else{
+					printf("\nInvalid command!\n");
+					bzero(command,sizeof(command));
 				}
 			}
 		}//end of receive command check else
